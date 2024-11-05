@@ -1,0 +1,63 @@
+import argparse
+import subprocess
+import datetime
+from graphviz import Digraph
+
+def get_commit_dependencies(repo_path, date_limit):
+    """
+    Получает список коммитов и их зависимости из репозитория Git.
+    Возвращает словарь зависимостей в формате {коммит: [родительские_коммиты]}.
+    """
+    result = {}
+    
+    # Используем команду Git для получения коммитов с родительскими зависимостями
+    log_command = [
+        "git", "-C", repo_path, "log", "--pretty=%H %P", "--since", date_limit
+    ]
+    try:
+        log_output = subprocess.check_output(log_command).decode("utf-8").strip().split("\n")
+        for line in log_output:
+            parts = line.split()
+            commit = parts[0]
+            parents = parts[1:]
+            result[commit] = parents
+    except subprocess.CalledProcessError:
+        print("Ошибка: Не удалось получить данные о коммитах.")
+        return None
+
+    return result
+
+def build_graph(dependencies, output_path):
+    """
+    Строит граф зависимостей коммитов и сохраняет его в файл PNG.
+    """
+    dot = Digraph(comment="Git Commit Dependencies")
+    for commit, parents in dependencies.items():
+        dot.node(commit, commit)
+        for parent in parents:
+            dot.edge(parent, commit)
+    
+    # Сохранение в PNG
+    dot.format = "png"
+    dot.render(output_path)
+    print(f"Граф зависимостей успешно сохранен в {output_path}.png")
+
+def main():
+    parser = argparse.ArgumentParser(description="Визуализатор графа зависимостей Git-коммитов")
+    parser.add_argument("repo_path", help="Путь к анализируемому репозиторию")
+    parser.add_argument("output_path", help="Путь к файлу с изображением графа зависимостей")
+    parser.add_argument("date_limit", help="Дата начала коммитов для анализа (в формате ГГГГ-ММ-ДД)")
+
+    args = parser.parse_args()
+
+    # Получаем зависимости коммитов
+    dependencies = get_commit_dependencies(args.repo_path, args.date_limit)
+    if dependencies is None:
+        print("Ошибка: Не удалось построить граф зависимостей.")
+        return
+    
+    # Строим и сохраняем граф
+    build_graph(dependencies, args.output_path)
+
+if name == "main":
+    main()
